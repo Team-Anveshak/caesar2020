@@ -1,0 +1,7 @@
+SUBSYSTEM=="tty", ENV{ID_PATH}=="pci-0000:00:1d.0-usb-0:1:1.0", SYMLINK+="imu"
+SUBSYSTEM=="tty", ENV{ID_PATH}=="pci-0000:00:1d.0-usb-0:1:1.0", SYMLINK+="gps"
+SUBSYSTEM=="tty", ENV{ID_PATH}=="pci-0000:00:1d.0-usb-0:1:1.0", SYMLINK+="arm"
+SUBSYSTEM=="tty", ENV{ID_PATH}=="pci-0000:00:1d.0-usb-0:1:1.0", SYMLINK+="drive"
+
+
+

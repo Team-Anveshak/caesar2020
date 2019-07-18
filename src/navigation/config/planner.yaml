@@ -1,0 +1,7 @@
+dist_tolerance: 10.0
+bearing_tolerance: 10.0
+forward: 40
+turn_min: 20
+turn_max: 40
+kp_turn: 0.5
+kp_forward: 0.5

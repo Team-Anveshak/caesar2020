@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node respawn="true" pkg="sensors" type="imu.py" > 
+   </node>
+
+   <node respawn="true" pkg="sensors" type="nmea_serial" >
+    </node>
+
+</launch>

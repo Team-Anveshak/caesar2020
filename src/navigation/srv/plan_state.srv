@@ -1,0 +1,5 @@
+int8 pause
+int8 contin
+int8 rst
+---
+string state

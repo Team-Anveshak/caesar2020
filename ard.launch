@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node respawn="true" pkg="rosserial_python" type="serial_node.py" name="arm_arduino" >
+     <param name="port" type="string" value="/dev/arm" />
+   </node>
+
+  <node respawn="true" pkg="rosserial_python" type="serial_node.py" name="drive_stm" >
+    <param name="port" type="string" value="/dev/drive" />
+   </node>
+
+
+</launch>
