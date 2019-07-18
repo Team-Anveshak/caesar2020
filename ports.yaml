@@ -1,0 +1,5 @@
+imu_port: '/dev/ttyUSB0'
+gps_port: '/dev/ttyUSB0'
+rplidarNode/serial_port: '/dev/ttyUSB1'
+drive_stm/port: '/dev/drive'
+arm_arduino/port: '/dev/arm'

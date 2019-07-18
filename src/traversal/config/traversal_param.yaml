@@ -1,3 +1,3 @@
-bearing_tolerance: 0.1
-min_Omega: 2.9
-multiplier: 11.0
+rot_server/bearing_tolerance: 3
+rot_server/min_Omega: 300
+rot_server/multiplier: 11.0

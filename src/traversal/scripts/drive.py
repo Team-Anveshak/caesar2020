@@ -37,8 +37,8 @@ class drive():
 			rpm.vel = self.straight*s_arr[self.d-1]
 			rpm.omega = self.zero_turn*s_arr[self.d-1]
 			print rpm ; print '--------------\n'
-			rpm.vel = int(rpm.vel>0)*4095 + (int(rpm.vel>0)*2-1)self.straight*s_arr[self.d-1]
-			rpm.omega = int(rpm.omega>0)*4095 + (int(rpm.omega>0)*2-1)self.straight*s_arr[self.d-1]
+			rpm.vel = int(rpm.vel>0)*4095 + (int(rpm.vel>0)*2-1)*self.vel
+			rpm.omega = int(rpm.omega>0)*4095 + (int(rpm.omega>0)*2-1)*self.omega
 
 		else:
 			
