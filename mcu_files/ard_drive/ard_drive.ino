@@ -11,7 +11,7 @@
 #define b4 20
 
 int vel = 0, omega = 0;
-bool hb = False;
+bool hb = false;
 
 ros::NodeHandle nh;
 
@@ -26,7 +26,7 @@ void loco(int address)
   Wire.endTransmission();
 }
 
-void roverMotionCallback(const man_ctrl::WheelRpm& RoverRpm)
+void roverMotionCallback(const traversal::WheelRpm& RoverRpm)
 {
   vel = int(RoverRpm.vel);
   omega = int(RoverRpm.omega);
@@ -39,7 +39,7 @@ void roverMotionCallback(const man_ctrl::WheelRpm& RoverRpm)
 }
 
 
-ros::Subscriber<man_ctrl::WheelRpm> locomotion_sub("motion", &roverMotionCallback);
+ros::Subscriber<traversal::WheelRpm> locomotion_sub("motion", &roverMotionCallback);
 
 void setup() {
   nh.initNode();
