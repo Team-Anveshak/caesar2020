@@ -13,10 +13,10 @@ alt="Caesar" width="50%"/>
 
 ***
 ## Follow Us!
-<a href="https://facebook.com/Anveshak.CFI.IITM
+<a href="https://facebook.com/anveshak.iitm/
 " target="_blank"><img src="https://cdn1.iconfinder.com/data/icons/logotypes/32/square-facebook-128.png" 
 alt="fb" width="50" height="50" border="20" /></a>&emsp;&emsp;&emsp;&emsp;
-<a href="https://www.youtube.com/channel/UCiYcMDTMdyaxfUrP-6C2HAQ
+<a href="https://www.youtube.com/channel/team-anveshak/
 " target="_blank"><img src="https://cdn1.iconfinder.com/data/icons/logotypes/32/youtube-128.png" 
 alt="yt" width="50" height="50" border="20" /></a>&emsp;&emsp;&emsp;&emsp;
 <a href="https://www.instagram.com/anveshak_iitm/
