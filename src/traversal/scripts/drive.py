@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from man_ctrl.msg import WheelRpm
+from traversal.msg import WheelRpm
 from sensor_msgs.msg import Joy
 import numpy
 import math
@@ -36,15 +36,15 @@ class drive():
 
 			rpm.vel = self.straight*s_arr[self.d-1]
 			rpm.omega = self.zero_turn*s_arr[self.d-1]
-			print rpm ; print '--------------\n'
-			rpm.vel = int(rpm.vel>0)*4095 + (int(rpm.vel>0)*2-1)*self.vel
-			rpm.omega = int(rpm.omega>0)*4095 + (int(rpm.omega>0)*2-1)*self.omega
+			print rpm ; print '--------------'
+			rpm.vel = int(rpm.vel>0)*4095 + (int(rpm.vel>0)*2-1)*rpm.vel
+			rpm.omega = int(rpm.omega>0)*4095 + (int(rpm.omega>0)*2-1)*rpm.omega
 
 		else:
 			
 			rpm.vel = 0
 			rpm.omega = 0
-			print rpm ; print '--------------\n'
+			print rpm ; print 'Mode : %d \n--------------'%(self.d)
 
 		self.pub_motor.publish(rpm)
 

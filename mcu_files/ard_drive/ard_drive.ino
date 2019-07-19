@@ -1,6 +1,6 @@
 /* rosserial Subscriber For Locomotion Control */
 #include <ros.h>
-#include <man_ctrl/WheelRpm.h>
+#include <traversal/WheelRpm.h>
 
 #include <Wire.h>
 #include <Servo.h>

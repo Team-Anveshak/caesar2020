@@ -32,14 +32,14 @@ void receiveEvent(int howMany)
     vel = vel1 + (vel2<<8);
     omega = om1 + (om2<<8);
     
-    if(vel>4095){
-      vel = vel-4095;
+    if(vel>32767){
+      vel = vel-32767;
     }else{
       vel = -vel;
     }
     
-    if(omega>4095){
-      omega = omega-4095;
+    if(omega>3767){
+      omega = omega-32767;
     }else{
       omega = -omega;
     }
@@ -49,7 +49,7 @@ void receiveEvent(int howMany)
 
 void setup()
 {
-timer.setPeriod(50);
+  timer.setPeriod(50);
 
   pinMode(PWMl, PWM);
   pinMode(PWMr, PWM);
@@ -82,8 +82,8 @@ timer.setPeriod(50);
 void loop()
 {
 
-  pwmr = int(constrain((vel + omega), -4095, 4095));
-  pwml = int(constrain((vel - omega), -4095, 4095));
+  pwmr = int(constrain((vel + omega), -32767, 32767));
+  pwml = int(constrain((vel - omega), -32767, 32767));
 
   if (hb==0)
   {
