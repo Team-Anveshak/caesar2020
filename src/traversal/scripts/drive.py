@@ -19,7 +19,7 @@ class drive():
 		self.zero_turn = 0
 		self.d = 1
 		self.brake = False
-		self.s_arr = [700,1150,1700,2500]
+		self.s_arr = [80,150,200,250]
 
 	def spin(self):
 		rate = rospy.Rate(10)
@@ -34,11 +34,11 @@ class drive():
 		
 		if(abs(self.straight)>0.05 or abs(self.zero_turn)>0.05):
 
-			rpm.vel = self.straight*s_arr[self.d-1]
-			rpm.omega = self.zero_turn*s_arr[self.d-1]
+			rpm.vel = self.straight*self.s_arr[self.d-1]
+			rpm.omega = self.zero_turn*self.s_arr[self.d-1]
 			print rpm ; print '--------------'
-			rpm.vel = int(rpm.vel>0)*4095 + (int(rpm.vel>0)*2-1)*rpm.vel
-			rpm.omega = int(rpm.omega>0)*4095 + (int(rpm.omega>0)*2-1)*rpm.omega
+			rpm.vel = (int(rpm.vel>0))*500 + (int(rpm.vel>0)*2-1)*rpm.vel
+			rpm.omega = (int(rpm.omega>0))*500 + (int(rpm.omega>0)*2-1)*rpm.omega
 
 		else:
 			
@@ -61,12 +61,12 @@ class drive():
 		if(msg.buttons[5]==1):
 			if self.d < 4:
 				self.d = self.d + 1
-				print("Max pwm is {}".format(s_arr[self.d-1]))
+				print("Max pwm is {}".format(self.s_arr[self.d-1]))
 		
 		elif(msg.buttons[4]==1):
 			if self.d >1:
 				self.d = self.d - 1
-				print("Max pwm is {}".format(s_arr[self.d-1]))
+				print("Max pwm is {}".format(self.s_arr[self.d-1]))
 
 if __name__ == '__main__':
 	run = drive()

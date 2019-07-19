@@ -3,7 +3,7 @@ HardwareTimer timer(3);
 #include <Wire_slave.h>
 
 /////
-int address = 16;   //change address here 15,16,17
+int address = 17;   //change address here 15,16,17
 /////
 
 #define CSr PA2
@@ -18,6 +18,7 @@ int address = 16;   //change address here 15,16,17
 
 int vel1 ,vel2 , om1 ,om2 = 0, hb =0;
 int pwmr = 0, pwml = 0;
+int vel,omega=0;
 
 void receiveEvent(int howMany)
 {
@@ -32,14 +33,14 @@ void receiveEvent(int howMany)
     vel = vel1 + (vel2<<8);
     omega = om1 + (om2<<8);
     
-    if(vel>32767){
-      vel = vel-32767;
+    if(vel>500){
+      vel = vel-500;
     }else{
       vel = -vel;
     }
     
-    if(omega>3767){
-      omega = omega-32767;
+    if(omega>500){
+      omega = omega-500;
     }else{
       omega = -omega;
     }
@@ -49,7 +50,8 @@ void receiveEvent(int howMany)
 
 void setup()
 {
-  timer.setPeriod(50);
+  timer.setPrescaleFactor(4);
+  timer.setOverflow(500);
 
   pinMode(PWMl, PWM);
   pinMode(PWMr, PWM);
@@ -76,14 +78,14 @@ void setup()
   digitalWrite(slpr,LOW);
   digitalWrite(DIRr, LOW);
   digitalWrite(DIRl, LOW);
-
+timer.refresh();
 }
 
 void loop()
 {
 
-  pwmr = int(constrain((vel + omega), -32767, 32767));
-  pwml = int(constrain((vel - omega), -32767, 32767));
+  pwmr = int(vel+omega);
+  pwml = int(vel-omega);
 
   if (hb==0)
   {
@@ -125,9 +127,9 @@ void loop()
   }
   else
   {
-  	digitalWrite(slpr, LOW);
+  	digitalWrite(slpr, HIGH);
 	pwmWrite(PWMr, 0);
-	digitalWrite(slpl, LOW);
+	digitalWrite(slpl, HIGH);
 	pwmWrite(PWMl, 0);
   }
 
