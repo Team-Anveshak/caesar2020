@@ -9,6 +9,8 @@ Command line args
 help: Print this help and exit
 append: Append to existing log file instead of overwriting it
 
+Press 'Enter' while the program is running to manually log present coordinates
+
 Subscriptions:
 /fix of type sensor_msgs/NavSatFix (to obtain GPS coordinates)
 /log_gps_now of type std_msgs/Empty (command to log present coords)
@@ -32,6 +34,7 @@ import rospy
 import std_msgs.msg as std_msgs
 import sensor_msgs.msg as sensor_msgs
 import gps_coords
+from threading import Thread
 
 # for command line args, exit
 import sys
@@ -54,6 +57,7 @@ LOG_FILE_PATH = LOG_DIR + '/' + LOG_FILENAME
 # globals, to set later
 file_mode = ''  # log file is opened in this mode
 status_pub = None   # publishes start and end of logging
+shutdown = False    # threads use this to know when to stop
 
 # object to keep track of current GPS location
 gps_fix = gps_coords.GpsCoords()
@@ -78,6 +82,19 @@ def log_now_call_back(msg):
     # after running once, all future changes should be appended
     file_mode = 'a'
 
+# continuously publishes 1 to /telemetry_status, indicating telemetry is going on
+# use this in a separate thread
+# publishes 0 and quits when global shutdown is set
+def publish_telemetry_status(publisher):
+    global shutdown
+    
+    rate = rospy.Rate(1)
+    while not shutdown:
+        publisher.publish(1)
+        rate.sleep()
+    
+    publisher.publish(0)
+
 # sets up subscriptions and callbacks
 def setup_logger():
     rospy.init_node(NODE_NAME)
@@ -90,16 +107,18 @@ def setup_logger():
     signal.signal(signal.SIGINT, end_program)
     
     # keep indicating that telemetry is in progress
-    rate = rospy.Rate(1)
-    while True:
-        status_pub.publish(1)
-        rate.sleep()
+    status_pub_thread = Thread(target = publish_telemetry_status, args = [status_pub])
+    status_pub_thread.start()
     
-    rospy.spin()
+    # also accept gps-log commands from stdin
+    while True:
+        raw_input('--- Press Enter to log present coordinates ---')
+        log_now_call_back(None)
 
 # publishes end of telemetry and quit
 def end_program(signal, frame):
-    status_pub.publish(0)
+    global shutdown
+    shutdown = True
     print
     sys.exit(0)
 
