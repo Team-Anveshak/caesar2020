@@ -16,7 +16,6 @@ All indents are 4 spaces
 import sys
 import rospy
 
-import std_msgs.msg as std_msgs
 import sensor_msgs.msg as sensor_msgs
 import navigation.msg
 
@@ -58,7 +57,6 @@ class GDMNode:
         
         # subscribe
         rospy.Subscriber('fix', sensor_msgs.NavSatFix, self.main.gps.update)
-        rospy.Subscriber('gdm_command', std_msgs.String, self.command_callback)
         rospy.Subscriber('planner_state', navigation.msg.Planner_state, self.main.planner_callback)
         
         # setup publisher
@@ -279,7 +277,7 @@ class Main:
     # updates the planner state
     def planner_callback(self, msg):
         self.planner_status = msg.status
-        print msg.status
+        #print msg.status
     
     ###############################
     

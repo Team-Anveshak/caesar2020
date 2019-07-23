@@ -1,7 +1,5 @@
-dist_tolerance: 10.0
-bearing_tolerance: 10.0
-forward: 40
-turn_min: 20
-turn_max: 40
-kp_turn: 0.5
-kp_forward: 0.5
+planner/dist_tolerance: 1.5
+planner/bearing_tolerance: 7.0
+planner/forward_max: 100.0
+planner/forward_min: 40.0
+planner/forward_mult: 1.0

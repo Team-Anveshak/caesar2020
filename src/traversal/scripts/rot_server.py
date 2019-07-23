@@ -19,8 +19,9 @@ class rotateService():
 		rospy.Subscriber("imu", Imu, self.imuCallback)
 
 		self.bearing_tolerance = rospy.get_param('/rot_server/bearing_tolerance',2)
-		self.min_Omega = rospy.get_param('/rot_server/min_Omega',200) 
-		self.multiplier = rospy.get_param('/rot_server/bearing_tolerance',5)
+		self.min_Omega = rospy.get_param('/rot_server/min_Omega',40) 
+		self.max_Omega = rospy.get_param('/rot_server/max_Omega',100) 
+		self.multiplier = rospy.get_param('/rot_server/bearing_tolerance',1)
 		self.curr_bear = 0.0
 
 
@@ -68,9 +69,10 @@ class rotateService():
 
 
 	def omegaManager(self,angle):
-		precOmega = self.min_Omega + abs(angle)*self.multiplier				#units in rpm giving a min of 10rpm
-		reqOmega = precOmega - (precOmega%5)
-		return reqOmega
+		Omega = self.min_Omega + abs(angle)*self.multiplier				#units in rpm giving a min of 10rpm
+		if Omega>self.max_Omega:
+			Omega = self.max_Omega
+		return Omega
 
 	def imuCallback(self,msg):
 		self.curr_bear=msg.yaw
