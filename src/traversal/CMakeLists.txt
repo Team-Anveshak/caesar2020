@@ -60,6 +60,8 @@ find_package(catkin REQUIRED COMPONENTS
  add_service_files(
    FILES
    rotate.srv   
+   move.srv
+   user_input.srv
 )
 
 ## Generate actions in the 'action' folder

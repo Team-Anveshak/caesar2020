@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import rospy
 from traversal.msg import WheelRpm
+from traversal.srv import *
 from sensor_msgs.msg import Joy
+from sensors.msg import Imu
 import numpy
 import math
 
@@ -11,15 +13,34 @@ class drive():
 
 		rospy.init_node("drive")
 
-		self.pub_motor = rospy.Publisher("motion",WheelRpm,queue_size=10)
-
-		rospy.Subscriber("/joy",Joy,self.joyCallback)
+		#Service to decide control mode - autonomous or joystick    
+		input_service = rospy.Service('active_input', user_input, self.user_input)
+		
+		#Service which rotates the rover to a specified bearing
+		rotate_service = rospy.Service('rotator',rotate,self.rotator)
+		
+		#Service written as extra to move rover straight for specified distance.
+		#Use once wheel odometry is achieved
+		move_service= rospy.Service('move_straight',move,self.mover)
+		
+		#output for arduino
+		self.pub_motor = rospy.Publisher("motion",WheelRpm,queue_size=10)   
+		
+		rospy.Subscriber("drive_inp",WheelRpm,self.driveCallback)   #autonomous input
+		rospy.Subscriber("imu", Imu, self.imuCallback)              #bearing input
+		rospy.Subscriber("/joy",Joy,self.joyCallback)               #joystick input
 
 		self.straight = 0
 		self.zero_turn = 0
-		self.d = 1
+		self.vel = 0
+		self.omega = 0
+		self.d = 0
 		self.brake = False
 		self.s_arr = [40,100,150,200,800]
+		self.bearing_tolerance = rospy.get_param('/rot_server/bearing_tolerance',2)
+		self.active_input = 0
+		self.divider = rospy.get_param('/rot_server/divider', 1.64)
+		self.control = ['joystick', 'autonomous']
 
 	def spin(self):
 		rate = rospy.Rate(10)
@@ -32,42 +53,108 @@ class drive():
 		rpm = WheelRpm()
 		rpm.hb = self.brake
 		
-		if(abs(self.straight)>0.05 or abs(self.zero_turn)>0.05):
-
-			rpm.vel = self.straight*self.s_arr[self.d-1]
-			rpm.omega = self.zero_turn*self.s_arr[self.d-1]
-			
-			rpm.vel = 1024 - rpm.vel
-			rpm.omega = 1024 + rpm.omega
-			print rpm ; print '--------------'
-		else:
-			
-			rpm.vel = 1024
-			rpm.omega = 1024
-			print rpm ; print 'Mode : %d \n--------------'%(self.d)
+		rpm.vel = 1024 - self.vel
+		rpm.omega = 1024 + self.omega
+		print rpm 
+		print 'Mode : %d \nControl: %s \n--------------'%(self.d+1, self.control[self.active_input])
 
 		self.pub_motor.publish(rpm)
 
+	def user_input(self, user_input):
+		if(user_input.active_input == 0):
+			self.active_input = user_input.active_input
+			return user_inputResponse("joystick control active")
+			print "control handed over to joystick\n"
+		elif(user_input.active_input == 1):
+			self.active_input = user_input.active_input
+			return user_inputResponse("autonomous control active")
+			print "autonomous control active\n"
+		else:
+			return user_inputResponse("invalid input")
+
+	def rotator(self, request):
+
+		Rpm = WheelRpm()
+		self.final_bear = request.angle
+		self.initial_bear = self.curr_bear
+		self.remainAngle = self.final_bear - self.curr_bear
+		self.omega = self.omegaManager(self.remainAngle)
+
+		Rpm.hb = False
+		#Rpm.theta = 0
+
+		while (abs(self.remainAngle) > self.bearing_tolerance):
+
+			Rpm.vel = 1024
+			self.remainAngle = self.final_bear - self.curr_bear
+			self.omega = self.omegaManager(self.remainAngle)
+
+			if self.remainAngle>180 :
+				self.remainAngle = self.remainAngle - 360
+			elif self.remainAngle<-180 :
+				self.remainAngle = self.remainAngle + 360
+				
+			if self.remainAngle<0:
+				Rpm.omega = 1024 + int(self.omega)
+			else:
+				Rpm.omega = 1024 + int(-self.omega)
+
+			self.pub_motor.publish(Rpm)
+			
+		# Rpm = WheelRpm()
+		self.pub_serv.publish(Rpm)
+		return rotateResponse("Rotate_finished")
+
+	def omegaManager(self,angle):
+		precOmega = 40 + abs(angle)/self.divider        # varies the omega depending 
+		return precOmega                        # on angle to be turned
+	
+	def mover(self,distance):
+		pass
+
+	def velManager(self,distance):
+		pass
+
+	def driveCallback(self,msg):
+		if (self.active_input == 1):
+			self.vel = msg.vel
+			self.omega = msg.omega
+			self.hb = False
+		else: 
+			pass
+
 	def joyCallback(self,msg):
 		
-		self.straight  = msg.axes[1]
-		self.zero_turn = msg.axes[2]
+		if(msg.buttons[0] == 1):
+			self.active_input = not self.active_input
 
-		if(msg.buttons[7]==1):
-			self.brake = True
+		if (self.active_input == 0):
+
+			if(abs(msg.axes[1])>0.05 or abs(msg.axes[2])>0.05):
+				self.vel = msg.axes[1]*self.s_arr[self.d]
+				self.omega = msg.axes[2]*self.s_arr[self.d]
+			else:
+				self.vel = 0
+				self.omega = 0
+			if(msg.buttons[7]==1):
+				self.brake = True
+			else:
+				self.brake = False
+
+			if(msg.buttons[5]==1):
+				if self.d < 4:
+					self.d = self.d + 1
+			
+			elif(msg.buttons[4]==1):
+				if self.d > 0:
+					self.d = self.d - 1
+
 		else:
-			self.brake = False
+			pass
 
-		if(msg.buttons[5]==1):
-			if self.d < 5:
-				self.d = self.d + 1
-				print("Max pwm is {}".format(self.s_arr[self.d-1]))
-		
-		elif(msg.buttons[4]==1):
-			if self.d >1:
-				self.d = self.d - 1
-				print("Max pwm is {}".format(self.s_arr[self.d-1]))
+	def imuCallback(self,msg):
+		self.curr_bear=msg.yaw
 
 if __name__ == '__main__':
 	run = drive()
-	run.spin()
+	run.spin()	
