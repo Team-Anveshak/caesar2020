@@ -3,7 +3,7 @@ HardwareTimer timer(3);
 #include <Wire_slave.h>
 
 /////
-int address = 17;   //change address here 15,16,17
+int address = 20;   //change address here 15,16,17
 /////
 
 #define CSr PA2
@@ -79,7 +79,7 @@ void setup()
   digitalWrite(slpr,LOW);
   digitalWrite(DIRr, LOW);
   digitalWrite(DIRl, LOW);
-timer.refresh();
+
 }
 
 void loop()
