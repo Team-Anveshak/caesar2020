@@ -36,7 +36,8 @@ class drive():
 		self.omega = 0
 		self.d = 0
 		self.brake = False
-		self.s_arr = [40,100,150,200,800]
+		self.rotate = False
+		self.s_arr = [5, 10, 20, 50] #[40,100,150,200,800]
 		self.bearing_tolerance = rospy.get_param('/rot_server/bearing_tolerance',2)
 		self.active_input = 0
 		self.divider = rospy.get_param('/rot_server/divider', 1.64)
@@ -49,16 +50,18 @@ class drive():
 			rate.sleep()
 
 	def main(self):
+            if True: # not self.rotate:	
+			rpm = WheelRpm()
+			rpm.hb = self.brake
+			
+			rpm.vel = 127 + self.vel
+			rpm.omega = 127 + self.omega
+			print rpm 
+			print 'Mode : %d \nControl: %s \n--------------'%(self.d+1, self.control[self.active_input])
 
-		rpm = WheelRpm()
-		rpm.hb = self.brake
-		
-		rpm.vel = 1024 - self.vel
-		rpm.omega = 1024 + self.omega
-		print rpm 
-		print 'Mode : %d \nControl: %s \n--------------'%(self.d+1, self.control[self.active_input])
-
-		self.pub_motor.publish(rpm)
+			self.pub_motor.publish(rpm)
+	    else:
+			print('rotation service active')
 
 	def user_input(self, user_input):
 		if(user_input.active_input == 0):
@@ -74,39 +77,46 @@ class drive():
 
 	def rotator(self, request):
 
-		Rpm = WheelRpm()
+		if self.control == 'joystick':
+			return rotateResponse("Rotate_cant be done")
 		self.final_bear = request.angle
 		self.initial_bear = self.curr_bear
 		self.remainAngle = self.final_bear - self.curr_bear
 		self.omega = self.omegaManager(self.remainAngle)
+		self.vel = 0
+		
+		
+		while (abs(self.remainAngle) > self.bearing_tolerance and self.active_input == 1):
 
-		Rpm.hb = False
-		#Rpm.theta = 0
-
-		while (abs(self.remainAngle) > self.bearing_tolerance):
-
-			Rpm.vel = 1024
+			#Rpm.vel = 127
+			self.rotate = True
 			self.remainAngle = self.final_bear - self.curr_bear
-			self.omega = self.omegaManager(self.remainAngle)
-
+			#self.omega = self.omegaManager(self.remainAngle)
+                        
 			if self.remainAngle>180 :
 				self.remainAngle = self.remainAngle - 360
 			elif self.remainAngle<-180 :
 				self.remainAngle = self.remainAngle + 360
-				
-			if self.remainAngle<0:
-				Rpm.omega = 1024 + int(self.omega)
-			else:
-				Rpm.omega = 1024 + int(-self.omega)
-
-			self.pub_motor.publish(Rpm)
 			
-		# Rpm = WheelRpm()
-		self.pub_serv.publish(Rpm)
+			omega_tmp = self.omegaManager(self.remainAngle)
+	
+			if self.remainAngle<0:
+				self.omega = int(omega_tmp)
+			else:
+				self.omega = - int(omega_tmp)
+                        
+			
+		
+		self.rotate = False
+                rate = rospy.Rate(2)
+                self.vel = 0
+                self.omega = 0
+                rate.sleep()
 		return rotateResponse("Rotate_finished")
+                
 
 	def omegaManager(self,angle):
-		precOmega = 40 + abs(angle)/self.divider        # varies the omega depending 
+		precOmega = 8 + abs(angle)/self.divider        # varies the omega depending 
 		return precOmega                        # on angle to be turned
 	
 	def mover(self,distance):
