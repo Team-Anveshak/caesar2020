@@ -1,4 +1,4 @@
-#Arduino to STM communication using UDP Communication Protocol
+#Arduino communication using UDP Communication Protocol
 Dependencies:
 *Python: pygame, socket
 ##How to use
