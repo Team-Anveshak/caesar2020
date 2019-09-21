@@ -25,33 +25,24 @@ void receiveEvent(int howMany)
   if ( Wire.available())
   {
     vel1 = Wire.read();
-    vel2 = Wire.read();
+    //vel2 = Wire.read();
     om1 = Wire.read();
-    om2 = Wire.read();
+    //om2 = Wire.read();
     hb = Wire.read();
     
-    vel = vel1 + (vel2<<8);
-    omega = om1 + (om2<<8);
+    //vel = vel1 + (vel2<<8);
+    //omega = om1 + (om2<<8);
     
-    if(vel>1024){
-      vel = vel-1024;
-    }else{
-      vel = -vel;
-    }
-    
-    if(omega>1024){
-      omega = omega-1024;
-    }else{
-      omega = -omega;
-    }
-
+    vel=vel1-127;
+    omega=om1-127;	  
+	
   }
 }
 
 void setup()
 {
-  timer.setPrescaleFactor(4);
-  timer.setOverflow(1024);
+  timer.setPrescaleFactor(32);
+  timer.setOverflow(127);
   timer.refresh();
 
   pinMode(PWMl, PWM);
