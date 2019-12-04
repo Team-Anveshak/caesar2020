@@ -1,6 +1,6 @@
-HardwareTimer timer(3);
+//HardwareTimer timer(3);
 
-#include <Wire_slave.h>
+#include <Wire.h>
 
 /////
 int address = 20;   //change address here 15,16,17
@@ -8,12 +8,12 @@ int address = 20;   //change address here 15,16,17
 
 #define CSr PA2
 #define CSl PA3
-#define slpr PA4
-#define slpl PA5
-#define DIRr PA6
-#define DIRl PA7
-#define PWMr PB0
-#define PWMl PB1
+#define slpr PB14
+#define slpl PA11
+#define DIRr PA10
+#define DIRl PB15
+#define PWMr PA8
+#define PWMl PA9
 
 
 int vel1 ,vel2 , om1 ,om2 = 0, hb =0;
@@ -40,13 +40,14 @@ void receiveEvent(int howMany)
 }
 
 void setup()
-{
-  timer.setPrescaleFactor(32);
-  timer.setOverflow(127);
-  timer.refresh();
+{ Serial.end();
+  pinMode(PA11, OUTPUT);
+  //timer.setPrescaleFactor(32);
+  //timer.setOverflow(127);
+  //timer.refresh();
 
-  pinMode(PWMl, PWM);
-  pinMode(PWMr, PWM);
+  pinMode(PWMl, OUTPUT);
+  pinMode(PWMr, OUTPUT);
   pinMode(slpl, OUTPUT);
   pinMode(slpr, OUTPUT);
   pinMode(DIRr, OUTPUT);
@@ -64,8 +65,8 @@ void setup()
 
   Wire.onReceive(receiveEvent);
 
- pwmWrite(PWMl, 0);
-  pwmWrite(PWMr,0);
+ //pwmWrite(PWMl, 0);
+  //pwmWrite(PWMr,0);
   digitalWrite(slpl, LOW);
   digitalWrite(slpr,LOW);
   digitalWrite(DIRr, LOW);
@@ -75,7 +76,7 @@ void setup()
 
 void loop()
 {
-
+  analogWriteFrequency(17000);
   pwmr = int(vel+omega);
   pwml = int(vel-omega);
 
@@ -85,44 +86,44 @@ void loop()
 	  {
 	    digitalWrite(slpr, HIGH);
 	    digitalWrite(DIRr, HIGH);
-	    pwmWrite(PWMr, abs(pwmr));
+	    analogWrite(PWMr, abs(pwmr));
 	  }
 	  else if (pwmr < 0)
 	  {
 	    digitalWrite(slpr, HIGH);
 	    digitalWrite(DIRr, LOW);
-	    pwmWrite(PWMr, abs(pwmr));
+	    analogWrite(PWMr, abs(pwmr));
 	  }
 	  else
 	  {
 	    digitalWrite(slpr, LOW);
-	    pwmWrite(PWMr, 0);
+	    analogWrite(PWMr, 0);
 	  }
 
 	  if (pwml > 0)
 	  {
 	    digitalWrite(slpl, HIGH);
 	    digitalWrite(DIRl, LOW);
-	    pwmWrite(PWMl, abs(pwml));
+	    analogWrite(PWMl, abs(pwml));
 	  }
 	  else if (pwml < 0)
 	  {
 	    digitalWrite(slpl, HIGH);
 	    digitalWrite(DIRl, HIGH);
-	    pwmWrite(PWMl, abs(pwml));
+	    analogWrite(PWMl, abs(pwml));
 	  }
 	  else
 	  {
 	    digitalWrite(slpl, LOW);
-	    pwmWrite(PWMl, 0);
+	    analogWrite(PWMl, 0);
 	  }
   }
   else
   {
   	digitalWrite(slpr, HIGH);
-	pwmWrite(PWMr, 0);
+	analogWrite(PWMr, 0);
 	digitalWrite(slpl, HIGH);
-	pwmWrite(PWMl, 0);
+	analogWrite(PWMl, 0);
   }
 
 }
