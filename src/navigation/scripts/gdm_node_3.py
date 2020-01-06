@@ -16,6 +16,7 @@ import sensor_msgs.msg as sensor_msgs
 import navigation.msg
 
 import navigation.srv
+import detection.srv
 
 from gps_coords import GpsCoords
 
@@ -43,13 +44,14 @@ class GDMNode:
         # consts
         self.NODE_NAME = 'gdm_node'
         DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-	    DIR_PATH = os.path.dirname(DIR_PATH) + '/config/'
+        DIR_PATH = os.path.dirname(DIR_PATH) + '/config/'
         self.DEST_FILENAME = DIR_PATH + 'dest_coords.txt'
         self.TELE_FILENAME = DIR_PATH + 'telemetry_coords.txt'
         
         # initialise state
         self.main = Main(publish_func = self.publish_goal,
-                         planner_srv_call = self.planner_srv_call)
+                         planner_srv_call = self.planner_srv_call,
+                         reached_srv_call = self.reached_srv_call)
         rospy.init_node(self.NODE_NAME)
         
         # subscribe
@@ -62,9 +64,14 @@ class GDMNode:
         # setup service (unless specified disabled)
         if noservice:
             self.planner_service = None
+            self.reached_service = None
         else:
+            rospy.loginfo ('waiting for services')
             rospy.wait_for_service('Planner_state_ctrl')
             self.planner_service = rospy.ServiceProxy('Planner_state_ctrl', navigation.srv.plan_state)
+            rospy.wait_for_service('reached')
+            self.reached_service = rospy.ServiceProxy('reached', detection.srv.reached)
+            rospy.loginfo ('services acquired')
 
         # start wayfinding
         # wayfinding may be interrupted by terminal input or /gdm_command
@@ -164,6 +171,15 @@ class GDMNode:
             self.planner_service(msg)
         except rospy.ServiceException:
             print 'Error calling planner service'
+    
+    # wrapper func for reached service
+    def reached_srv_call (self):
+        if not self.reached_service:
+            return
+        try:
+            result = self.reached_srv()
+        except rospy.ServiceException:
+            print 'Error calling reached service'
 
 # end GDMNode
 ####################################################################################
@@ -178,11 +194,12 @@ class Main:
 
     # setup with the function used for publishing and to call the planner service
     # publish_func should take two args: distance, bearing
-    def __init__(self, publish_func, planner_srv_call):
+    def __init__(self, publish_func, planner_srv_call, reached_srv_call):
         
         # output functions
         self.publish_func = publish_func
         self.planner_srv_call = planner_srv_call
+        self.reached_srv_call = reached_srv_call
         
         # current gps location
         self.gps = GpsCoords()
@@ -295,6 +312,9 @@ class Main:
             # current goal reached?
             elif self.planner_status == 1:
                 print 'Reached GPS location',
+                
+                # temporarily turn over control to the reached service to find the marker
+                self.reached_srv_call()
                 
                 # update list of destinations
                 print self.dest_gps[0].latitude, self.dest_gps[0].longitude
