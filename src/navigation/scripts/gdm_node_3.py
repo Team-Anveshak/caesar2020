@@ -43,7 +43,7 @@ class GDMNode:
         # consts
         self.NODE_NAME = 'gdm_node'
         DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-	DIR_PATH = os.path.dirname(DIR_PATH) + '/config/'
+	    DIR_PATH = os.path.dirname(DIR_PATH) + '/config/'
         self.DEST_FILENAME = DIR_PATH + 'dest_coords.txt'
         self.TELE_FILENAME = DIR_PATH + 'telemetry_coords.txt'
         

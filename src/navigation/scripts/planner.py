@@ -2,14 +2,14 @@
 #add service to reload params
 import rospy
 from navigation.srv import *
-from man_ctrl.srv import *
 from navigation.msg import *
 from sensors.msg import *
-from man_ctrl.msg import *
-
-import thread, time
+from traversal.msg import *
+from traversal.srv import *
 from termcolor import colored
 import numpy as np
+import sys, signal,thread
+
 
 class Planner():
 	
@@ -33,54 +33,58 @@ class Planner():
 		#service server
 		self.state_ser=rospy.Service('Planner_state_ctrl',plan_state,self.state_ctrl) #state service
 
-		#service clients
-		rospy.wait_for_service('rotator')
-		try:
-			self.drive_rotate_srv = rospy.ServiceProxy('rotator', rotate)
-		except Exception,e:
-			print "Service call failed: %s"%e
-
-		self.bearing_dest = self.bearing_curr        
-
 	def spin(self):
-		rate = rospy.Rate(1)
-		self.bearing_dest = self.bearing_curr
+		rate = rospy.Rate(25)		
 		while not rospy.is_shutdown():
 			self.main() #main func
 			rate.sleep()
 
 	def main(self):
-		#print(self.state)
 		if(self.state=="run"):
-				if(self.distance_to_dest > self.dist_tolerance): 
-					self.pub_planner_state.publish(0)
-					if(abs(self.bearing_dest-self.bearing_curr)<self.bearing_tolerance):
-						forward_vel = self.forward_vel_cal(self.forward_min,self.forward_max,1.5)
-						self.drive_pub(forward_vel,0)  #setup a primitive pid w.r.t to diatnce to be travelled.
-					else:
-						self.obs_scanner_active = False
-						try:
-							print colored('\n Sending request for %f'%self.bearing_dest,'white')
-							result = self.drive_rotate_srv(float(self.bearing_dest))
-							print result
-						except rospy.ServiceException,e :
-							print "Service call failed: %s"%e
-						#send service call to drive node to turn to self.bearing destination
-				else:
-					self.pub_planner_state.publish(1)
-					self.drive_pub(0.0,0.0)
-					self.obs_scanner_active = False
-					rospy.loginfo("Destination reached")
+			if(self.distance_to_dest > self.dist_tolerance): 
+				self.obs_scanner_active = False					
+				self.pub_planner_state.publish(0)
+
+				if self.iter == 0 :
+					result = self.rotator()
+					print result
+					self.iter = self.iter+1
+
+				if abs(self.bearing_dest-self.bearing_curr)>3*self.bearing_tolerance:
+					result = self.rotator()
+					print result
+				elif self.distance_to_dest < 3*self.dist_tolerance:
+					self.omega = 0
+					self.vel = self.forward_vel_cal(1.5)
+					self.drive_pub()
+				else:				
+					error=self.bearing_dest-self.bearing_curr
+					print error
+					if error>180 :
+						error = error - 360
+					elif error<-180 :
+						error = error + 360
+					
+					self.omega = self.output(error)
+					self.vel = self.forward_vel_cal(1.5)
+					self.drive_pub()
+
+			else :
+				self.pub_planner_state.publish(1)
+				self.obs_scanner_active = False
+				rospy.loginfo("Desination Reached!")
 
 		elif(self.state=="pause"):
 			pass
 			
 		elif(self.state=="stop"):
-			self.drive_pub(0.0,0.0,self.forward_max)
+			self.vel = 0
+			self.omega = 0 
+			self.drive_pub()
+			self.pub_planner_state.publish(0)
 			pass
 
 	def state_ctrl(self,srv_msg):
-
 		if (srv_msg.pause==1 and srv_msg.contin==0 ) :
 			self.state = "pause"
 		elif (srv_msg.contin==1 and srv_msg.pause==0):
@@ -89,52 +93,117 @@ class Planner():
 			self.state = "stop"
 		else:
 			rospy.loginfo("Error in changing planner state")
-		# print(srv_msg.contin)
+		#print(srv_msg.contin)
 		return plan_stateResponse(self.state)
 
+	def rotator(self):		
+		while (abs(self.bearing_dest - self.bearing_curr) > self.bearing_tolerance):
+			remainAngle = self.bearing_dest - self.bearing_curr
+						
+			if remainAngle>180 :
+				remainAngle = remainAngle - 360
+			elif remainAngle<-180 :
+				remainAngle = remainAngle + 360
+			
+			omega_tmp = 17 + abs(remainAngle)/8
+	
+			if remainAngle<0:
+				self.omega = int(omega_tmp)
+			else:
+				self.omega = - int(omega_tmp)
+			self.vel = 0
+			self.drive_pub()
+
+		rate = rospy.Rate(2)
+		self.vel = 0
+		self.omega = 0
+		self.drive_pub()
+		rate.sleep()
+		return "Rotate_finished - error=%f"%(self.bearing_dest-self.bearing_curr)
+
+	def output(self,error):
+		tim = rospy.get_time()
+		dt = tim-self.time_prev
+
+		if(self.time_prev==0):
+			dt=0
+
+		self.tsys+=dt
+
+		output_p = error*self.kp
+		if(dt!=0):
+			output_d=((error-self.error_prev)/dt)*self.kd
+		else:
+			output_d=0
+		self.error_int=self.error_int+error*dt
+		output_i=self.error_int*self.ki
+		output = -(output_p+output_d+output_i)
+
+		self.time_prev=tim
+		self.error_prev=error
+
+		if output>0 :
+			output=min(127,output)
+		else:
+			output=max(-127,output)
+
+		return output
+
+	
 	def load_params(self):
 		self.dist_tolerance     = float(rospy.get_param('/planner/dist_tolerance', 1.5))        #in metres ; default 5 metre
-		self.bearing_tolerance  = float(rospy.get_param('/planner/bearing_tolerance', 11.0))    #in degrees ; default 10 degrees
-		self.forward_max        = float(rospy.get_param('/planner/forward_max', 18.0))          #in terms of pwm now
-		self.forward_min        = float(rospy.get_param('/planner/forward_min', 9.0))          #in terms of pwm now          #in terms of pwm value
+		self.bearing_tolerance  = float(rospy.get_param('/planner/bearing_tolerance', 4))    #in degrees ; default 10 degrees
+		self.forward_max        = 45#float(rospy.get_param('/planner/forward_max', 40))          #in terms of pwm now
+		self.forward_min        = 30#float(rospy.get_param('/planner/forward_min', 25))          #in terms of pwm now          #in terms of pwm value
 		self.forward_mult       = float(rospy.get_param('/planner/forward_mult', 1.0))
+		self.divider            = float(rospy.get_param('/planner/divider', 2))
+		self.kp=1.7
+		self.ki=0.6
+		self.kd=0
 
 	def load_vars(self):
-		self.state                  = "stop"  # states are 'run','pause','stop'
-		self.distance_to_dest       = 400.0
-		self.bearing_dest           = 0.0
-		self.bearing_curr           = 0.0   #current bearing of the rover
+		self.state  = "run"  # states are 'run','pause','stop' 
+		self.bearing_dest = 150
+		self.bearing_curr = 0			#current bearing of the rover
+		self.distance_to_dest = 20
+		self.vel = 0
+		self.omega = 0
+		self.iter = 0
 
+		self.error_prev=0
+		self.error_int=0
+		self.time_prev=0
+		self.tsys=0
+		
 	def imuCallback(self,msg):
 		self.bearing_curr = msg.yaw
 
 	def goalCallback(self,msg):# each time i am getting a new goal i have to reset the distance calculator node
-		self.distance_to_dest = msg.distance
-		self.bearing_dest = msg.bearing
+		self.distance_to_dest = float(msg.distance)
+		self.bearing_dest = float(msg.bearing)
 
 	def distCallback(self,msg): #getting the position of the bot from the pos calculator
 		self.dist = msg.dist
 
-	def rplCallback(self,msg): #getting the position of the bot from the pos calculator
-		self.lidar = np.array(msg.ranges)
+	'''def rplCallback(self,msg): #getting the position of the bot from the pos calculator
+		self.lidar = np.array(msg.ranges)'''
 
-	def reset(self): #for resetting all variables to start position, sending the distance calculator to reset etc
-		self.load_vars()
-		self.load_params()
-		self.drive_pub(0.0,0.0)
-		#need to reset distance calculator
-
-	def drive_pub(self,vel,omega): #used to send the drive node the info, the value of theta taken is 0 to 359 if any other value is given the service won't be called.
-		rpm =WheelRpm()
-		rpm.vel=vel
-		rpm.omega=omega
+	def drive_pub(self): #used to send the drive node the info, the value of theta taken is 0 to 359 if any other value is given the service won't be called.
+		rpm = WheelRpm()
+		rpm.vel=self.vel
+		rpm.omega=self.omega
 		self.pub_drive.publish(rpm)
 
-	def forward_vel_cal(self,vel_min,vel_max,vel_mult):
-		vel = vel_min + (abs(vel_max-vel_min)*vel_mult)
-		return min(vel,vel_max)
+	def forward_vel_cal(self,vel_mult):
+		vel = self.forward_min + (abs(self.forward_max-self.forward_min)*vel_mult)
+		return min(vel,self.forward_max)
+
+def signal_handler(signal, frame):  #For catching keyboard interrupt Ctrl+C
+	print "\nProgram exiting....."
+	sys.exit(0)
 
 
 if __name__ == '__main__':
 	run = Planner()
+	signal.signal(signal.SIGINT, signal_handler)
 	run.spin()

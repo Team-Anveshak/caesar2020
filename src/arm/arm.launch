@@ -1,0 +1,4 @@
+<launch>
+    <node name="joy_arm" package="joy" type="joy_node" />
+    <node name="arm_drive" package="arm" type="run.py" />
+</launch>

@@ -1,5 +1,5 @@
 rot_server/bearing_tolerance: 3.0
-rot_server/min_Omega: 60.0
+rot_server/min_Omega: 8.0
 rot_server/max_Omega: 115.0
 rot_server/multiplier: 1.0
-rot_server/divider: 1.64
+rot_server/divider: 30.0

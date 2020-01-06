@@ -4,7 +4,7 @@ import rospy
 from sensor_msgs.msg import NavSatFix
 from navigation.msg import Goal,Planner_state
 from navigation.srv import *
-#from obj_detect.srv import *
+from detection.srv import *
 
 from math import *
 import sys, signal,thread
@@ -18,8 +18,8 @@ class GPS() :
 		rospy.wait_for_service('Planner_state_ctrl')
 		self.state_srv = rospy.ServiceProxy('Planner_state_ctrl', plan_state)
 		
-		'''rospy.wait_for_service('obj_detect')
-		self.obj_srv = rospy.ServiceProxy('obj_detect', obj_detect)'''
+		rospy.wait_for_service('reached')
+		self.obj_srv = rospy.ServiceProxy('reached', reached)
 
 		self.pub_goal = rospy.Publisher('goal', Goal,queue_size=10) 	#Publisher to planner
 
@@ -83,22 +83,22 @@ class GPS() :
 						goal.distance = self.dist_gps
 						goal.bearing = self.bearing
 						self.pub_goal.publish(goal)
-						rate = rospy.Rate(1)
+						rate = rospy.Rate(5)
 						rate.sleep()
 					except Exception:
 						print colored("ERROR in planner part",'red')
 
 				if(self.planner_status == 1):
 					self.srv("rst")
-					rate = rospy.Rate(1)
+					rate = rospy.Rate(0.5)
 					rate.sleep()
 					self.srv("pause")
 				
-				'''try:
+				try:
 					result = self.obj_srv()
-					print "Object detection: \n%s"%resp
+					print "Object detection: \n%s"%result
 				except rospy.ServiceException:
-					print colored("Object service failed",'red')'''
+					print colored("Object service failed",'red')
 
 				print colored("\n Moving to next GPS point.. \n",'white')
 
@@ -170,13 +170,6 @@ def signal_handler(signal, frame):  #For catching keyboard interrupt Ctrl+C
 
 
 if __name__ == '__main__':
-
-	x = raw_input('Do you want to start the node? (y/n) : ')
-
 	gps = GPS()
 	signal.signal(signal.SIGINT, signal_handler)
-
-	if(x == 'y'):
-		gps.run()
-	else:
-		sys.exit()
+	gps.run()

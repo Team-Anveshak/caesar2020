@@ -37,10 +37,10 @@ class drive():
 		self.d = 0
 		self.brake = False
 		self.rotate = False
-		self.s_arr = [5, 10, 20, 50] #[40,100,150,200,800]
+		self.s_arr = [25,35,50,75,110]#[40,100,150,200,800][5, 10, 20, 50,90]
 		self.bearing_tolerance = rospy.get_param('/rot_server/bearing_tolerance',2)
 		self.active_input = 0
-		self.divider = rospy.get_param('/rot_server/divider', 1.64)
+		self.divider = rospy.get_param('/rot_server/divider', 30)
 		self.control = ['joystick', 'autonomous']
 
 	def spin(self):
@@ -50,17 +50,17 @@ class drive():
 			rate.sleep()
 
 	def main(self):
-            if True: # not self.rotate:	
+		if True: # not self.rotate:	
 			rpm = WheelRpm()
 			rpm.hb = self.brake
 			
-			rpm.vel = 127 + self.vel
+			rpm.vel = 127- self.vel
 			rpm.omega = 127 + self.omega
 			print rpm 
 			print 'Mode : %d \nControl: %s \n--------------'%(self.d+1, self.control[self.active_input])
 
 			self.pub_motor.publish(rpm)
-	    else:
+		else:
 			print('rotation service active')
 
 	def user_input(self, user_input):
@@ -92,7 +92,7 @@ class drive():
 			self.rotate = True
 			self.remainAngle = self.final_bear - self.curr_bear
 			#self.omega = self.omegaManager(self.remainAngle)
-                        
+						
 			if self.remainAngle>180 :
 				self.remainAngle = self.remainAngle - 360
 			elif self.remainAngle<-180 :
@@ -104,16 +104,15 @@ class drive():
 				self.omega = int(omega_tmp)
 			else:
 				self.omega = - int(omega_tmp)
-                        
-			
 		
-		self.rotate = False
-                rate = rospy.Rate(2)
-                self.vel = 0
-                self.omega = 0
-                rate.sleep()
+			self.rotate = False
+			rate = rospy.Rate(2)
+			self.vel = 0
+			self.omega = 0
+			rate.sleep()
+
 		return rotateResponse("Rotate_finished")
-                
+				
 
 	def omegaManager(self,angle):
 		precOmega = 8 + abs(angle)/self.divider        # varies the omega depending 
