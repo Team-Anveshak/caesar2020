@@ -126,4 +126,7 @@ void loop()
 	analogWrite(PWMl, 0);
   }
 
+  // give PWM time to properly write
+  delay (10);
+
 }
