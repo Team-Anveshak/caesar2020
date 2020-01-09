@@ -39,13 +39,13 @@ class GDMNode:
     Reads from terminal
     """
     
-    def __init__(self, noservice = False):
+    def __init__(self, noplanner=False, nodetect=False):
         
         # consts
         self.NODE_NAME = 'gdm_node'
         DIR_PATH = os.path.dirname(os.path.realpath(__file__))
         DIR_PATH = os.path.dirname(DIR_PATH) + '/config/'
-        self.DEST_FILENAME = DIR_PATH + 'dest_coords.txt'
+        self.DEST_FILENAME = DIR_PATH + 'gps_data.txt'
         self.TELE_FILENAME = DIR_PATH + 'telemetry_coords.txt'
         
         # initialise state
@@ -62,16 +62,21 @@ class GDMNode:
         self.goal_publisher = rospy.Publisher('goal', navigation.msg.Goal, queue_size=10)
         
         # setup service (unless specified disabled)
-        if noservice:
+        if noplanner:
             self.planner_service = None
-            self.reached_service = None
         else:
-            rospy.loginfo ('waiting for services')
+            rospy.loginfo ('waiting for planner service')
             rospy.wait_for_service('Planner_state_ctrl')
             self.planner_service = rospy.ServiceProxy('Planner_state_ctrl', navigation.srv.plan_state)
+            rospy.loginfo ('planner service acquired')
+        
+        if nodetect:
+            self.reached_service = None
+        else:
+            rospy.loginfo ('waiting for detection service')
             rospy.wait_for_service('reached')
             self.reached_service = rospy.ServiceProxy('reached', detection.srv.reached)
-            rospy.loginfo ('services acquired')
+            rospy.loginfo ('detection service acquired')
 
         # start wayfinding
         # wayfinding may be interrupted by terminal input or /gdm_command
@@ -177,7 +182,7 @@ class GDMNode:
         if not self.reached_service:
             return
         try:
-            result = self.reached_srv()
+            result = self.reached_service()
         except rospy.ServiceException:
             print 'Error calling reached service'
 
@@ -298,8 +303,12 @@ class Main:
     
     # main thread funciton
     def run(self):
-        rate = rospy.Rate(1)
-    
+        rate = rospy.Rate(5)
+
+        # reset planner
+        self.planner_srv_call('rst')
+        self.planner_status = 0
+
         while not self.is_shutdown:
         
             rate.sleep()
@@ -313,6 +322,10 @@ class Main:
             elif self.planner_status == 1:
                 print 'Reached GPS location',
                 
+                self.planner_srv_call('pause')
+                self.planner_status = 0
+                
+                rate.sleep()
                 # temporarily turn over control to the reached service to find the marker
                 self.reached_srv_call()
                 
@@ -363,7 +376,7 @@ node = None
 # parse command line arguments and start the gdm node
 def begin(argv):
     # parse argv
-    argdict = {'noservice':False, 'help':False}
+    argdict = {'noplanner':False, 'nodetect':False, 'help':False}
     for arg in argv:
         argdict[arg] = True
     
@@ -373,17 +386,21 @@ def begin(argv):
         sys.exit(0)
     
     # no services should be called
-    noservice = False
-    if argdict['noservice']:
-        print 'Services will not be called'
-        noservice = True
+    noplanner = False
+    if argdict['noplanner']:
+        print 'Planner service will not be called'
+        noplanner = True
+    
+    nodetect = False
+    if argdict['nodetect']:
+        print 'Detection service will not be called'
     
     #DEBUG
     print argdict
     
     # start GDMNode
     global node
-    node = GDMNode(noservice)
+    node = GDMNode(noplanner, nodetect)
     
     # catch keyboard interrupts to shut down cleanly
     signal.signal(signal.SIGINT, end_program)
@@ -416,3 +433,4 @@ if __name__ == '__main__':
 
     
     
+
