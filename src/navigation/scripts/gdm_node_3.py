@@ -63,20 +63,22 @@ class GDMNode:
         
         # setup service (unless specified disabled)
         if noplanner:
+            rospy.loginfo ('GDM Node: Planner service will not be called')
             self.planner_service = None
         else:
-            rospy.loginfo ('waiting for planner service')
+            rospy.loginfo ('Waiting for planner service')
             rospy.wait_for_service('Planner_state_ctrl')
             self.planner_service = rospy.ServiceProxy('Planner_state_ctrl', navigation.srv.plan_state)
-            rospy.loginfo ('planner service acquired')
+            rospy.loginfo ('Planner service acquired')
         
         if nodetect:
+            rospy.loginfo ('GDM Node: Detection service will not be called')
             self.reached_service = None
         else:
-            rospy.loginfo ('waiting for detection service')
+            rospy.loginfo ('Waiting for detection service')
             rospy.wait_for_service('reached')
             self.reached_service = rospy.ServiceProxy('reached', detection.srv.reached)
-            rospy.loginfo ('detection service acquired')
+            rospy.loginfo ('Detection service acquired')
 
         # start wayfinding
         # wayfinding may be interrupted by terminal input or /gdm_command
@@ -91,12 +93,18 @@ class GDMNode:
         terminal_inp_thread.setDaemon(True)
         terminal_inp_thread.start()
         
+        # for use in planner_srv_call
+        self._psc_lastcont = False
+        
+        rospy.loginfo ('GDM Node Setup Complete')
+        
     # end init
     ###############################
     
     
     # kills this object and all processes started by it
     def kill(self):
+        rospy.loginfo ('GDM Node Exiting')
         self.main.kill()
         self.is_shutdown = True
         sys.exit(0)
@@ -173,9 +181,14 @@ class GDMNode:
             return
         
         try:
-            self.planner_service(msg)
+            ret = self.planner_service(msg)
+            
+            if not msg.contin or (msg.contin and not self._psc_lastcont):
+                rospy.loginfo ("Planner service called with option '"+option+"' returned "+ret.state)
+            self._psc_lastcont = msg.contin
+            
         except rospy.ServiceException:
-            print 'Error calling planner service'
+            rospy.logerr ('Error calling planner service')
     
     # wrapper func for reached service
     def reached_srv_call (self):
@@ -183,8 +196,9 @@ class GDMNode:
             return
         try:
             result = self.reached_service()
+            rospy.loginfo ('Detection service complete')
         except rospy.ServiceException:
-            print 'Error calling reached service'
+            rospy.logerr ('Error calling detection service /reached')
 
 # end GDMNode
 ####################################################################################
@@ -250,7 +264,7 @@ class Main:
         
         # file not formatted correctly
         except ValueError:
-            print 'Input file not formatted correctly'
+            rospy.logerr ('Input file not formatted correctly')
             print 'Please check: ' + filename
             print 'Each line should have the form `latitude longitude`\n'
             self.dest_gps = []
@@ -272,8 +286,9 @@ class Main:
             if infile:
                 infile.close()
         
+        rospy.loginfo ('Loading GPS locations')
         for point in self.dest_gps:
-            print point.latitude, point.longitude
+            print 'Loaded: '+str(point.latitude)+', '+str(point.longitude)
     
     # start calculating and publishing using given function
     # creates the main thread if it does not exist
@@ -283,14 +298,18 @@ class Main:
         if not self.main_thread:
             self.main_thread = threading.Thread(target = self.run)
             self.main_thread.start()
+        
+        rospy.loginfo ('GDM Node: Main thread started')
     
     # stop publishing until start is called again
     def pause(self):
         self.is_paused = True
+        rospy.loginfo ('GDM Node: Main thread paused')
     
     # end all threads begun by this class
     # once called, the same object cannot be reused
     def kill(self):
+        rospy.loginfo ('GDM Node: Killing main thread')
         self.is_shutdown = True
     
     # updates the planner state
@@ -303,7 +322,7 @@ class Main:
     
     # main thread funciton
     def run(self):
-        rate = rospy.Rate(5)
+        rate = rospy.Rate(2)
 
         # reset planner
         self.planner_srv_call('rst')
@@ -320,19 +339,18 @@ class Main:
             
             # current goal reached?
             elif self.planner_status == 1:
-                print 'Reached GPS location',
                 
                 self.planner_srv_call('pause')
                 self.planner_status = 0
+                
+                rospy.loginfo ('Reached GPS location '+str(self.dest_gps[0].latitude)+', '+str(self.dest_gps[0].longitude))
                 
                 rate.sleep()
                 # temporarily turn over control to the reached service to find the marker
                 self.reached_srv_call()
                 
                 # update list of destinations
-                print self.dest_gps[0].latitude, self.dest_gps[0].longitude
                 self.dest_gps.pop(0)
-                num_locations_left = len(self.dest_gps)
                 
                 # reset planner
                 self.planner_srv_call('rst')
@@ -340,8 +358,10 @@ class Main:
                 
                 # all loaded destinations completed?
                 if len(self.dest_gps) == 0:
-                    print 'All destinations reached, pausing'
-                    self.pause()
+                    rospy.loginfo ('GDM Node: All destinations reached, pausing')
+                else:
+                    rospy.loginfo ('GDM Node: Next target: '+str(self.dest_gps[0].latitude)+', '+str(self.dest_gps[0].longitude))
+                self.pause()
             
             # goal not yet reached
             else:
@@ -388,12 +408,11 @@ def begin(argv):
     # no services should be called
     noplanner = False
     if argdict['noplanner']:
-        print 'Planner service will not be called'
         noplanner = True
     
     nodetect = False
     if argdict['nodetect']:
-        print 'Detection service will not be called'
+        nodetect = True
     
     #DEBUG
     print argdict
