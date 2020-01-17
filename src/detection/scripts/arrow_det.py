@@ -2,6 +2,7 @@
 import rospy
 from traversal.msg import WheelRpm
 from detection.srv import *
+import sensor_msgs.msg as sensor_msgs
 import cv2
 import numpy as np
 
@@ -9,6 +10,9 @@ class ArrowNode():
 
 	def __init__(self):
 		rospy.init_node('arrow_det',anonymous=False)
+		rospy.Subscriber ('imu', sensor_msgs.Imu, self.imu_callback)
+		self.bearing = 0
+		
 		self.lefttemplate=cv2.imread("/home/neel/caesar2020/src/detection/left2.jpg",0)
 		self.lefttemplate=cv2.GaussianBlur(self.lefttemplate,(13,13),0)
 		self.righttemplate=cv2.imread("/home/neel/caesar2020/src/detection/right2.jpg",0)
@@ -104,7 +108,7 @@ class ArrowNode():
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						print "turning right"
-						self.rate_90.sleep()
+						self.wait_for_deviation (80)
 						self.x_n=0
 						self.x_above=0
 						self.x_below=0
@@ -149,7 +153,7 @@ class ArrowNode():
 						self.rpm.omega=-12
 						self.rpm.hb=False
 						print "turning left"
-						self.rate_90.sleep()
+						self.wait_for_deviation (80)
 						self.x_n=0
 						self.x_above=0
 						self.x_below=0
@@ -201,7 +205,7 @@ class ArrowNode():
 					self.x_above=0
 					self.x_below=0	
 					
-				if self.exit>200:
+				if self.exit>120:
 					break
 				
   
@@ -213,10 +217,21 @@ class ArrowNode():
 				
 		return "call service /reached"
 		
+	def wait_for_deviation (self, angle):
+		curr = self.bearing
+		while True:
+			dev = (curr - self.bearing) % 360
+			if dev > 180:
+				dev = 360 - dev
+			if dev > angle:
+				break
+		
 	def spin(self):
 		while True:
 			pass
 			
+	def imu_callback (self, msg):
+		self.bearing = msg.yaw
 			
 				
 if __name__=='__main__':
