@@ -24,8 +24,8 @@ class ArrowNode():
 		
 		self.pub=rospy.Publisher('drive_inp',WheelRpm,queue_size=10)
 		self.rate=rospy.Rate(10)
-		self.rate_90=rospy.Rate(0.15)  		#FIND TIME FOR 90 DEGREE TURN
-		self.rate_str=rospy.Rate(0.28)
+		self.rate_str2=rospy.Rate(0.18)  		#FIND TIME FOR 90 DEGREE TURN
+		self.rate_str=rospy.Rate(0.5)
 		self.rpm = WheelRpm()
 		self.top_left_l=0
 		self.top_left_r=0
@@ -39,6 +39,9 @@ class ArrowNode():
 	def detect(self,msg):
 		while True:
 			
+			self.x_n=0
+			self.x_below=0
+			self.x_above=0
 			foundright = 0
 			foundleft=0
 			ret,img=self.video.read()
@@ -89,18 +92,27 @@ class ArrowNode():
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						self.x_n=self.x_n+1
+						self.x_below=0
+						self.x_above=0
+						self.rate_str.sleep()
 					elif x_r<=300:
 						self.rpm.vel=0
 						self.rpm.omega=12
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						self.x_below=self.x_below+1
+						self.x_n=0
+						self.x_above=0
+						self.rate.sleep()
 					else:
 						self.rpm.vel=0
 						self.rpm.omega=-12
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						self.x_above=self.x_above+1
+						self.x_below=0
+						self.x_n=0
+						self.rate.sleep()
 						
 					if self.h/s_r>=80 and self.rpm.vel==15:
 						self.rpm.vel=0
@@ -119,7 +131,7 @@ class ArrowNode():
 						self.rpm.omega=0
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
-						self.rate_str.sleep()
+						self.rate_str2.sleep()
 						
 					
 			    
@@ -135,20 +147,29 @@ class ArrowNode():
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						self.x_n=self.x_n+1
+						self.x_below=0
+						self.x_above=0
+						self.rate_str.sleep()
 					elif x_l<=300:
 						self.rpm.vel=0
 						self.rpm.omega=12
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						self.x_below=self.x_below+1
+						self.x_n=0
+						self.x_above=0
+						self.rate.sleep()
 					else:
 						self.rpm.vel=0
 						self.rpm.omega=-12
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
 						self.x_above=self.x_above+1
+						self.x_below=0
+						self.x_n=0
+						self.rate.sleep()
 						
-					if self.h/s_l>=80 and self.rpm.vel==15:
+					if self.h/s_l>=60 and self.rpm.vel==15:
 						self.rpm.vel=0
 						self.rpm.omega=-12
 						self.rpm.hb=False
@@ -163,7 +184,7 @@ class ArrowNode():
 						self.rpm.omega=0
 						self.rpm.hb=False
 						self.pub.publish(self.rpm)
-						self.rate_str.sleep()
+						self.rate_str2.sleep()
 						
 					
 			    
@@ -172,41 +193,58 @@ class ArrowNode():
 						
 				self.exit=self.exit+1
 				
-				if self.x_n > self.x_below and self.x_n > self.x_above and self.false_count<2:
+				if self.x_n > self.x_below and self.x_n > self.x_above:
 					self.rpm.vel=15
 					self.rpm.omega=0
 					self.rpm.hb=False
 					self.pub.publish(self.rpm)
-					self.false_count=self.false_count+1
+					self.rate.sleep()
+			
 				
-				elif self.x_above > self.x_n and self.x_above> self.x_below and self.false_count<2:
+				elif self.x_above > self.x_n and self.x_above> self.x_below:
 					self.rpm.vel=0
 					self.rpm.omega=-12
 					self.rpm.hb=False
 					self.pub.publish(self.rpm)
-					self.false_count=self.false_count+1
+					self.rate.sleep()
 					
-				elif self.x_below > self.x_n and self.x_below> self.x_above and self.false_count<2:
+					
+				elif self.x_below > self.x_n and self.x_below> self.x_above:
 					self.rpm.vel=0
 					self.rpm.omega=12
 					self.rpm.hb=False
 					self.pub.publish(self.rpm)
-					self.false_count=self.false_count+1
+					self.rate.sleep()
+					
 				
 				else :
 					self.rpm.vel=0
 					self.rpm.omega=12
 					self.rpm.hb=False
 					self.pub.publish(self.rpm)
+					self.rate.sleep()
 					
-				if self.false_count>=1:
-					self.false_count=0
+					
+				if self.exit>100:
+					self.rpm.vel=0
+					self.rpm.omega=12
+					self.rpm.hb=False
+					self.pub.publish(self.rpm)
+					print "turning left, 50-50 chance"
+					self.wait_for_deviation (80)
 					self.x_n=0
 					self.x_above=0
-					self.x_below=0	
+					self.x_below=0
 					
-				if self.exit>120:
+					print "going straight"
+					self.rpm.vel=15
+					self.rpm.omega=0
+					self.rpm.hb=False
+					self.pub.publish(self.rpm)
+					self.rate_str2.sleep()
+					
 					break
+					
 				
   
 			cv2.imshow('arrow',img)
