@@ -1,11 +1,13 @@
 import os
 import rospy
 import rospkg
+import threading
 from argparse import ArgumentParser
 from qt_gui.plugin import Plugin
 from python_qt_binding import loadUi
 from python_qt_binding.QtWidgets import QWidget
 from .my_widget import MyWidget
+
 class MyPlugin(Plugin):
 
     def __init__(self, context):
@@ -24,6 +26,10 @@ class MyPlugin(Plugin):
             print 'arguments: ', args
             print 'unknowns: ', unknowns
 
+	
+	
+
+    
         self._widget = MyWidget(context)
 	#ui_file = os.path.join(rospkg.RosPack().get_path('rqt_mypkg'), 'resource', 'MyPlugin.ui')
         #loadUi(ui_file, self._widget)
@@ -35,10 +41,11 @@ class MyPlugin(Plugin):
         if context.serial_number() > 1:
             self._widget.setWindowTitle(self._widget.windowTitle() + (' (%d)' % context.serial_number()))
         context.add_widget(self._widget)
+	
     #def a(self):
 	#print"hi"
     #def b(self):
-	#print"bye"    
+	#print"bye"
 
     def shutdown_plugin(self):
         # TODO unregister all publishers here
