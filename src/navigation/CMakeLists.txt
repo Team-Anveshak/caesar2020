@@ -53,6 +53,8 @@ find_package(catkin REQUIRED COMPONENTS
    Goal.msg
    Planner_state.msg
    Enc_dist.msg
+   ObstacleMap.msg
+   Target.msg
  )
 
 ## Generate services in the 'srv' folder
