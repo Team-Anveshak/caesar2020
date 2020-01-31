@@ -1,0 +1,11 @@
+# constants for mode and newmode
+# use EMPTY if you only wish to probe the current mode
+int8 IGNORE_OBSTACLES = 1
+int8 AVOID_OBSTACLES = 2
+int8 PAUSE = 0
+int8 EMPTY = -1
+
+int8 mode
+---
+# the mode the node is in after this operation
+int8 mode

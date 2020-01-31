@@ -62,6 +62,7 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
    plan_state.srv
    dist_state.srv
+   AvoidNodeCtrl.srv
  )
 
 ## Generate actions in the 'action' folder

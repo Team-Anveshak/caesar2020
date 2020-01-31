@@ -12,8 +12,9 @@ Publishes temporary destination Point
 import rospy
 import std_msgs.msg as std_msgs
 import sensor_msgs.msg as sensor_msgs
-# modify based on present package name
+
 import navigation.msg
+import navigation.srv
 
 import numpy as np
 import scipy.ndimage
@@ -29,6 +30,15 @@ COLLISION_RADIUS = 0.8 # in metres
 OBSTACLE_LIMIT = 10 # range of detection, in metres
 
 class VolatileVars:
+
+    # modes of operation
+    IGNORE_OBSTACLES = 1
+    AVOID_OBSTACLES = 2
+    DO_NOTHING = 0
+    SHUTDOWN = -1
+    # for printing purposes only
+    MODE_STRING = {IGNORE_OBSTACLES: 'IGNORE', AVOID_OBSTACLES: 'AVOID', DO_NOTHING: 'PAUSED', SHUTDOWN: 'EXIT_PENDING'}
+
     def __init__ (self):
         self.lat, self.lon = (0, 0)
         self.goal_lat, self.goal_lon = (0.1, 0)
@@ -45,13 +55,15 @@ class VolatileVars:
         self.imu_lock = threading.Lock()
         self.inp_locks = self.map_lock, self.curr_lock, self.goal_lock, self.imu_lock
         
+        # to publish
         self.dist = np.inf
         self.deviation = 0 # angle
         self.goal_dist = np.inf
         self.out_lock = threading.Lock()
         
-        # program end?
-        self.shutdown = False
+        # program control variable
+        self.control_lock = threading.Lock()
+        self.program_ctrl = self.DO_NOTHING
         
         #DEBUG)
         self.valid_map = np.zeros (0, dtype=np.bool_)
@@ -105,6 +117,16 @@ class VolatileVars:
 
 # Handles most ROS functionality
 class AvoidNode:
+
+    # create a 2-way dict to map ROS constants to VolatileVars constants
+    _ros = navigation.srv.AvoidNodeCtrlRequest
+    _vv = VolatileVars
+    MODE_DICT = {_ros.IGNORE_OBSTACLES:_vv.IGNORE_OBSTACLES,
+                 _ros.AVOID_OBSTACLES:_vv.AVOID_OBSTACLES,
+                 _ros.PAUSE:_vv.DO_NOTHING}
+    for key in MODE_DICT.keys():
+        MODE_DICT [MODE_DICT[key]] = key
+
     def __init__ (self, vvars, pub_freq):
         self.vvars = vvars
         self.pub_freq = pub_freq
@@ -117,11 +139,32 @@ class AvoidNode:
         rospy.Subscriber ("curr_loc", sensor_msgs.NavSatFix, vvars.update_curr_loc)
         rospy.Subscriber ("goal_loc", sensor_msgs.NavSatFix, vvars.update_goal_loc)
         rospy.Subscriber ("imu", sensor_msgs.Imu, vvars.update_yaw)
-        self.pub = rospy.Publisher ("target_loc", navigation.msg.Target, queue_size=1)
+        self.pub = rospy.Publisher ("target", navigation.msg.Target, queue_size=1)
         rospy.init_node ('avoid_node')
         
         #DEBUG
         self.valid_pub = rospy.Publisher ('valid_map', numpy_msg(std_msgs.ByteMultiArray), queue_size=1)
+        
+        # service to control operating mode
+        rospy.Service ('avoid_node_ctrl', navigation.srv.AvoidNodeCtrl, self.prog_ctrl_server)
+        
+        rospy.loginfo ('AvoidNode setup complete')
+        rospy.loginfo ('AvoidNode Operating mode: ' + VolatileVars.MODE_STRING [self.vvars.program_ctrl])
+    
+    # server to change the operating mode (self.vvars.program_ctrl)
+    def prog_ctrl_server (self, msg):
+        ret = None
+        with self.vvars.control_lock:
+            try:
+                self.vvars.program_ctrl = self.MODE_DICT [msg.mode]
+            except KeyError:
+                if msg.mode != msg.EMPTY:
+                    rospy.logwarn ('avoid_node_ctrl called with invalid value {}'.format (msg.mode))
+            
+            ret = navigation.srv.AvoidNodeCtrlResponse (self.MODE_DICT [self.vvars.program_ctrl])
+            rospy.loginfo ('AvoidNode Operating mode: ' + VolatileVars.MODE_STRING [self.vvars.program_ctrl])
+        
+        return ret
     
     # run in main thread
     def run_publish (self):
@@ -149,7 +192,7 @@ class Compute:
         debug_collision = True  # closest obstacle is closer than min. distance
         debug_stuck = True      # no valid angles to target
     
-    # calculates distance and bearing
+    # calculates distance and bearing (degrees)
     def great_circle (self, lat1, lon1, lat2, lon2):
         phi1, phi2, lambda1, lambda2 = map (np.radians, [lat1, lat2, lon1, lon2])
         dphi = phi2 - phi1
@@ -163,37 +206,6 @@ class Compute:
         bearing = np.degrees(theta)
         
         return dist, bearing
-        
-    # returns a boolean array of the same length as vvars.map indicating valid angles
-    def calc_valid_angles_old (self, data, goal_dist, limit=np.inf):
-        
-        clearance = 2.0 # MAGIC NUMBER
-        
-        if (limit > 10):
-            limit = 10
-        limit = int (limit)
-        if (limit < 1):
-            return np.zeros (shape=data.shape, dtype=np.bool_)
-        
-        invalid = np.zeros (shape=data.shape, dtype=np.bool_)
-        
-        delta = 2*np.pi / data.size
-        for r in range (limit, 0, -1):
-        
-            # expect np.nan comparisons to evaluate to false
-            with np.errstate (invalid='ignore'):
-                t_invalid = data < r
-            
-            angle = clearance / r
-            halfwidth = int (np.ceil (angle / delta))
-            weights = np.ones (2 * halfwidth + 1)
-            
-            t_invalid = scipy.ndimage.convolve (t_invalid, weights, mode='wrap')
-            invalid = np.logical_or (invalid, t_invalid)
-        
-        invalid = np.logical_or (invalid, np.isnan(data))
-        return np.logical_not (invalid)
-        #return data > min (goal_dist, limit)
         
     def calc_valid_angles (self, data, goal_dist, limit=np.inf):
         # computational complexity proportional to 90 / self.ANGLE_LC
@@ -277,12 +289,35 @@ class Compute:
         
         return dist, deviation, goal_dist, valid
     
+    # not thread safe (acquire locks before calling)
+    # calculates distance and required turning angle to the goal point
+    # ignores obstacle map
+    def no_obs_calc (self):
+        dist, bearing = self.great_circle (self.vvars.lat, self.vvars.lon,
+                self.vvars.goal_lat, self.vvars.goal_lon)
+        deviation = bearing - self.vvars.yaw
+        if deviation > 180:
+            deviation -= 360
+        return dist, deviation
+    
     # can be run in separate thread
     def run (self):
+    
         rate = rospy.Rate (self.FREQ)
-        while not self.vvars.shutdown:
+        while True:
+            ctrl = self.vvars.program_ctrl
+            if ctrl == VolatileVars.SHUTDOWN:
+                return
+            
+            dist, deviation, goal_dist, valid_map = 0, 0, 0, np.zeros(0, dtype=np.bool_)
             self.vvars.lock_inputs()
-            dist, deviation, goal_dist, valid_map  = self.calc()
+            
+            if ctrl == VolatileVars.AVOID_OBSTACLES:
+                dist, deviation, goal_dist, valid_map  = self.calc()
+            
+            elif ctrl == VolatileVars.IGNORE_OBSTACLES:
+                goal_dist, _ = dist, deviation = self.no_obs_calc()
+            
             self.vvars.unlock_inputs()
             self.vvars.set_output (dist, deviation, goal_dist, valid_map)
             rate.sleep()
@@ -296,7 +331,7 @@ def run():
     cthread = threading.Thread (target=compute.run)
     cthread.start()
     node.run_publish()
-    vvars.shutdown = True
+    vvars.program_ctrl = vvars.SHUTDOWN
     print
 
 run()
