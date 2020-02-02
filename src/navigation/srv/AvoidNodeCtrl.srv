@@ -6,6 +6,10 @@ int8 PAUSE = 0
 int8 EMPTY = -1
 
 int8 mode
+
+# leave as nan to avoid changing the destination
+float32 latitude
+float32 longitude
 ---
 # the mode the node is in after this operation
 int8 mode

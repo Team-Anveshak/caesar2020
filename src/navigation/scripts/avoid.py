@@ -161,6 +161,9 @@ class AvoidNode:
                 if msg.mode != msg.EMPTY:
                     rospy.logwarn ('avoid_node_ctrl called with invalid value {}'.format (msg.mode))
             
+            if all (~np.isnan ([msg.latitude, msg.longitude])):
+                self.vvars.update_goal_loc (msg)
+            
             ret = navigation.srv.AvoidNodeCtrlResponse (self.MODE_DICT [self.vvars.program_ctrl])
             rospy.loginfo ('AvoidNode Operating mode: ' + VolatileVars.MODE_STRING [self.vvars.program_ctrl])
         
@@ -170,11 +173,12 @@ class AvoidNode:
     def run_publish (self):
         rate = rospy.Rate (self.pub_freq)
         while not rospy.is_shutdown():
-            msg = navigation.msg.Target()
-            valid_msg = std_msgs.ByteMultiArray()
-            msg.target_dist, msg.deviation, msg.goal_dist, valid_msg.data = self.vvars.get_output()
-            self.pub.publish (msg)
-            self.valid_pub.publish (valid_msg)
+            if self.vvars.program_ctrl != VolatileVars.DO_NOTHING:
+                msg = navigation.msg.Target()
+                valid_msg = std_msgs.ByteMultiArray()
+                msg.target_dist, msg.deviation, msg.goal_dist, valid_msg.data = self.vvars.get_output()
+                self.pub.publish (msg)
+                self.valid_pub.publish (valid_msg)
             rate.sleep()
 
 class Compute:
