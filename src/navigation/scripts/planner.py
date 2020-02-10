@@ -6,7 +6,6 @@ from navigation.msg import *
 from sensors.msg import *
 from traversal.msg import *
 from traversal.srv import *
-from termcolor import colored
 import numpy as np
 import sys, signal,thread
 
