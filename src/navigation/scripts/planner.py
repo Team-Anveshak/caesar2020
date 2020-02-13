@@ -11,7 +11,7 @@ import sys, signal,thread
 
 
 class Planner():
-	
+
 	def __init__ (self):
 		rospy.init_node("Planner")
 		self.load_vars() #variables
@@ -20,7 +20,7 @@ class Planner():
 		#subscribers
 		try:
 			rospy.Subscriber("imu",Imu, self.imuCallback)
-			rospy.Subscriber("goal",Goal,self.goalCallback)
+			rospy.Subscriber("target",Target,self.goalCallback)
 			#rospy.Subscriber("scan",LaserScan,self.rplCallback)
 		except Exception,e:
 			print e
@@ -33,15 +33,15 @@ class Planner():
 		self.state_ser=rospy.Service('Planner_state_ctrl',plan_state,self.state_ctrl) #state service
 
 	def spin(self):
-		rate = rospy.Rate(25)		
+		rate = rospy.Rate(25)
 		while not rospy.is_shutdown():
 			self.main() #main func
 			rate.sleep()
 
 	def main(self):
 		if(self.state=="run"):
-			if(self.distance_to_dest > self.dist_tolerance): 
-				self.obs_scanner_active = False					
+			if(self.distance_to_dest > self.dist_tolerance):
+				self.obs_scanner_active = False
 				self.pub_planner_state.publish(0)
 
 				if self.iter == 0 :
@@ -56,14 +56,14 @@ class Planner():
 					self.omega = 0
 					self.vel = self.forward_vel_cal(1.5)
 					self.drive_pub()
-				else:				
+				else:
 					error=self.bearing_dest-self.bearing_curr
 					print error
 					if error>180 :
 						error = error - 360
 					elif error<-180 :
 						error = error + 360
-					
+
 					self.omega = self.output(error)
 					self.vel = self.forward_vel_cal(1.5)
 					self.drive_pub()
@@ -75,10 +75,10 @@ class Planner():
 
 		elif(self.state=="pause"):
 			pass
-			
+
 		elif(self.state=="stop"):
 			self.vel = 0
-			self.omega = 0 
+			self.omega = 0
 			self.drive_pub()
 			self.pub_planner_state.publish(0)
 			pass
@@ -95,17 +95,17 @@ class Planner():
 		#print(srv_msg.contin)
 		return plan_stateResponse(self.state)
 
-	def rotator(self):		
+	def rotator(self):
 		while (abs(self.bearing_dest - self.bearing_curr) > self.bearing_tolerance):
 			remainAngle = self.bearing_dest - self.bearing_curr
-						
+
 			if remainAngle>180 :
 				remainAngle = remainAngle - 360
 			elif remainAngle<-180 :
 				remainAngle = remainAngle + 360
-			
+
 			omega_tmp = 17 + abs(remainAngle)/8
-	
+
 			if remainAngle<0:
 				self.omega = int(omega_tmp)
 			else:
@@ -148,7 +148,7 @@ class Planner():
 
 		return output
 
-	
+
 	def load_params(self):
 		self.dist_tolerance     = float(rospy.get_param('/planner/dist_tolerance', 1.5))        #in metres ; default 5 metre
 		self.bearing_tolerance  = float(rospy.get_param('/planner/bearing_tolerance', 4))    #in degrees ; default 10 degrees
@@ -161,7 +161,7 @@ class Planner():
 		self.kd=0
 
 	def load_vars(self):
-		self.state  = "run"  # states are 'run','pause','stop' 
+		self.state  = "run"  # states are 'run','pause','stop'
 		self.bearing_dest = 150
 		self.bearing_curr = 0			#current bearing of the rover
 		self.distance_to_dest = 20
@@ -173,13 +173,16 @@ class Planner():
 		self.error_int=0
 		self.time_prev=0
 		self.tsys=0
-		
+
 	def imuCallback(self,msg):
 		self.bearing_curr = msg.yaw
 
 	def goalCallback(self,msg):# each time i am getting a new goal i have to reset the distance calculator node
-		self.distance_to_dest = float(msg.distance)
-		self.bearing_dest = float(msg.bearing)
+		self.distance_to_dest = float(msg.target_dist)
+		bearing_dest = (self.bearing_curr + float(msg.deviation)) % 360
+		if bearing_dest > 180:
+			bearing_dest -= 180
+		self.bearing_dest = bearing_dest
 
 	def distCallback(self,msg): #getting the position of the bot from the pos calculator
 		self.dist = msg.dist
