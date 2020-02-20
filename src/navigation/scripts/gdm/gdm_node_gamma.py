@@ -23,7 +23,7 @@ class Frontend:
         sys.exit(0)
 
     def spin (self):
-        while True:
+        while not rospy.is_shutdown():
             inp = raw_input().strip()
             if inp == 'pause':
                 self.node.pause()
