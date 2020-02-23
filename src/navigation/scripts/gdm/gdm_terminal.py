@@ -2,7 +2,7 @@
 
 import rospy
 import threading, signal, sys
-from gdm_server import GDMNode
+from _backend_gdm_node import GDMNode
 
 class Frontend:
     def __init__ (self):
@@ -14,7 +14,7 @@ class Frontend:
             'sleep 3000',
             'nav 120 90',
         ])
-        #self.node.begin()
+        self.node.begin()
 
         self.spin()
 
@@ -24,11 +24,18 @@ class Frontend:
 
     def spin (self):
         while not rospy.is_shutdown():
-            try:
-                inp = raw_input().strip()
-            except EOFError:
+            inp = raw_input().strip()
+            if inp == 'pause':
+                self.node.pause()
+            elif inp == 'resume':
+                self.node.resume()
+            elif inp == 'stop':
+                self.node.stop()
+            elif inp == 'reload':
+                self.node.reload()
+            elif inp == 'kill':
                 self.kill()
-                return
-            self.node.ctrl_server(inp)
+            elif inp == 'begin':
+                self.node.begin()
 
 Frontend()

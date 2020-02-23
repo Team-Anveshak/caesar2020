@@ -72,6 +72,12 @@ class Command (object):
 
         raise StatementFormatException ('invalid command type `{}`'.format(tokens[0]))
 
+    # convienience methods
+    begin_s =  staticmethod (lambda cmd: cmd.begin())
+    pause_s =  staticmethod (lambda cmd: cmd.pause())
+    resume_s = staticmethod (lambda cmd: cmd.resume())
+    stop_s =   staticmethod (lambda cmd: cmd.stop())
+
 class Sleep (Command):
     '''Do nothing for the specified number of milliseconds'''
 
@@ -202,99 +208,137 @@ class GDMNode (object):
 
         self.killed = False
         spin_thread = threading.Thread (target = self.spin)
+
+        # for self.ctrl_server
+        self._ctrl_server_argdict = {
+            'start'  : self.start,
+            'pause'  : self.pause,
+            'resume' : self.resume,
+            'stop'   : self.stop,
+            'skip'   : self.skip
+        }
         with self.exec_lock:
             spin_thread.start()
-            rospy.Service ('gdm_ctrl', navsrv.GDMCtrl, self.ctrl)
-            rospy.loginfo ('GDM Node init complete')
+            rospy.Service ('gdm_ctrl', navsrv.GDMCtrl, self.ctrl_server)
+            rospy.loginfo ('(init) GDM Node init complete')
+
+    _cmd_ctrl_argdict = {
+        'begin'  : (Command.begin_s, 'beginning [{}]'),
+        'pause'  : (Command.pause_s, 'pausing'),
+        'resume' : (Command.resume_s, 'resuming'),
+        'stop'   : (Command.stop_s, 'stopping [{}]')
+    }
+    def cmd_ctrl (self, arg):
+        '''
+        Wrapper for control methods of the current command
+        Silently andles exceptions and empty command list
+        Raises KeyError if arg is not in GDMNode._ctrl_argdict
+        '''
+        with self.exec_lock:
+            if self.killed or not len(self.cmds):
+                return
+            func, outstr = self._cmd_ctrl_argdict [arg]
+            rospy.loginfo (('(cmd_ctrl) '+outstr).format(self.cmds[0]))
+            try:
+                func (self.cmds[0])
+            except ControlFlowException as e:
+                rospy.logerr ('(cmd_ctrl) {}'.format(e))
 
     def load (self, program):
         '''
         Loads the given program (list of strs)
         Raises StatementFormatException
         '''
-        if self.killed:
-            return
-
-        cmds = []
-        for i, stmt in enumerate (program):
-            try:
-                cmd = Command.get_instance (self.node, stmt)
-            except StatementFormatException as e:
-                raise StatementFormatException ('error in line {}: {}'.format(i+1, e))
-            if cmd:
-                cmds.append (cmd)
-
         with self.exec_lock:
-            self.stop()
+            if self.killed:
+                return
+
+            cmds = []
+            for i, stmt in enumerate (program):
+                try:
+                    cmd = Command.get_instance (self.node, stmt)
+                except StatementFormatException as e:
+                    raise StatementFormatException ('error in line {}: {}'.format(i+1, e))
+                if cmd:
+                    cmds.append (cmd)
+
+            self.cmd_ctrl ('stop')
             self.cmds_full = cmds
-            self.cmds = list (self.cmds_full)
-            rospy.loginfo ('finished loading program')
+            rospy.loginfo ('(load) finished loading program')
             #DEBUG
             for cmd in self.cmds_full:
                 print cmd
 
-    def reload (self):
+    def start (self):
+        '''Starts or restarts loaded program'''
         with self.exec_lock:
             if self.killed:
                 return
-            self.stop()
-            rospy.loginfo ('loading last program')
-            self.cmds = list (self.cmds_full)
+            if not len (self.cmds_full):
+                rospy.logwarn ('(start) no program loaded yet')
+                return
+            self.cmd_ctrl ('stop')
+            rospy.loginfo ('(start) (re)starting loaded program')
+            self.cmds = list(self.cmds_full)
+            # DEBUG:
+            for cmd in self.cmds:
+                print cmd
+            self.cmd_ctrl ('begin')
 
-    ##############################
-    # called by self.ctrl (DO NOT CALL _* functions directly)
-
-    def _begin (self, cmd):
-        cmd.begin(cmd)
-
-    def _pause (self, cmd):
-        cmd.pause(cmd)
-
-    def _resume (self, cmd):
-        cmd.resume(cmd)
-
-    def _stop (self, cmd):
-        cmd.stop(cmd)
-        self.cmds = []
-
-    def _skip (self, cmd):
-        #TODO
-        cmd.stop(cmd)
-        self.cmds.pop(0)
-    ##############################
-
-    # arg may be str or navsrv.GDMCtrl
-    _ctrl_argdict = {
-        'begin':  (self._begin,  '[{}] started'),
-        'pause':  (self._pause,  'pausing'),
-        'resume': (self._resume, 'resuming'),
-        'stop':   (self._stop,   'program stopped')
-    }
-    def ctrl (self, arg):
-        try:
-            if not isinstance (arg, str):
-                arg = arg.data
-            func, outstr = self._ctrl_argdict[arg]
-        except (KeyError, AttributeError):
-            rospy.logerr ('invalid arg [{}] to gdm node ctrl'.format(arg))
-            return False
-
+    def pause (self):
+        '''Pauses the program'''
         with self.exec_lock:
-            if len (self.cmds) and not self.killed:
-                rospy.loginfo (outstr.format(self.cmds[0]))
-                try:
-                    func(self.cmds[0])
-                except ControlFlowException as e:
-                    rospy.logerr (e)
-                    return False
+            self.cmd_ctrl ('pause')
 
-        return True
+    def resume (self):
+        '''Resumes paused program'''
+        with self.exec_lock:
+            self.cmd_ctrl ('resume')
+
+    def stop (self):
+        '''Stops the current program and idles the node'''
+        with self.exec_lock:
+            if self.killed:
+                return
+            if not len (self.cmds):
+                rospy.logwarn ('(stop) program not running')
+                return
+            self.cmd_ctrl ('stop')
+            rospy.loginfo ('(stop) stopping program')
+            self.cmds = []
+
+    def skip (self):
+        '''Skips the current command'''
+        with self.exec_lock:
+            if self.killed:
+                return
+            if not len (self.cmds):
+                rospy.logwarn ('(skip) program not running')
+                return
+            self.cmd_ctrl ('stop')
+            self.cmds.pop(0)
+            if not len (self.cmds):
+                rospy.loginfo ('program complete')
+            else:
+                self.cmd_ctrl ('begin')
 
     def kill (self):
+        '''Signals the end of the spin thread'''
         with self.exec_lock:
-            self.ctrl ('stop')
-            rospy.loginfo ('killing main thread')
+            self.cmd_ctrl ('stop')
+            rospy.loginfo ('(kill) killing main thread')
             self.killed = True
+
+    def ctrl_server (self, arg):
+        '''Server for gdm_ctrl service'''
+        with self.exec_lock:
+            try:
+                func = self._ctrl_server_argdict[arg]
+            except KeyError:
+                rospy.logerr ('(ctrl_server) invalid arg [{}]'.format(arg))
+                return False
+            func()
+            return True
 
     def spin (self):
         rate = rospy.Rate (self.FREQ)
@@ -307,9 +351,9 @@ class GDMNode (object):
                 complete = self.cmds[0].spinOnce()
                 if complete:
                     cmd = self.cmds.pop(0)
-                    rospy.loginfo ('`{}` finished'.format(cmd))
+                    rospy.loginfo ('(spin) `{}` finished'.format(cmd))
                     if len (self.cmds):
-                        self.cmd[0].begin()
+                        self.cmd_ctrl ('begin')
                     else:
-                        rospy.loginfo ('program complete')
+                        rospy.loginfo ('(spin) program complete')
             rate.sleep()
