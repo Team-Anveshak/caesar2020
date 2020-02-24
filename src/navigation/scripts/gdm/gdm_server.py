@@ -285,6 +285,7 @@ class GDMNode (object):
                 print cmd
             self.cmd_ctrl ('begin')
 
+    # TODO: better pause resume control
     def pause (self):
         '''Pauses the program'''
         with self.exec_lock:
@@ -307,6 +308,7 @@ class GDMNode (object):
             rospy.loginfo ('(stop) stopping program')
             self.cmds = []
 
+    # TODO: skip should retain paused state
     def skip (self):
         '''Skips the current command'''
         with self.exec_lock:
@@ -331,6 +333,8 @@ class GDMNode (object):
 
     def ctrl_server (self, arg):
         '''Server for gdm_ctrl service'''
+        # input can be service message or raw str
+        arg = getattr (arg, 'data', arg)
         with self.exec_lock:
             try:
                 func = self._ctrl_server_argdict[arg]
