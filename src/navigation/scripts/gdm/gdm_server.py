@@ -102,7 +102,7 @@ class Sleep (Command):
     def pause (self):
         if self.tstart is None:
             raise ControlFlowException ('[{}] tried to pause before begin'.format(self))
-        self.t = rospy.Time.now().to_nsec() / self.ONEM
+        t = rospy.Time.now().to_nsec() / self.ONEM
         self.tvar += t - self.tlast
         self.tlast = None
 
