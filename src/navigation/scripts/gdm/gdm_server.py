@@ -19,7 +19,7 @@ class ROSNode (object):
     _avoid = navsrv.AvoidNodeCtrlRequest
 
     def __init__ (self):
-        rospy.init_node ('gdm_node')
+        rospy.init_node ('gdm')
 
         self.planner_reached = False
         rospy.Subscriber ('planner_state', navmsg.Planner_state, self.planner_cb)
@@ -219,7 +219,8 @@ class GDMNode (object):
         }
         with self.exec_lock:
             spin_thread.start()
-            rospy.Service ('gdm_ctrl', navsrv.GDMCtrl, self.ctrl_server)
+            rospy.Service ('~ctrl', navsrv.GDMCtrl, self.ctrl_server)
+            rospy.Service ('~program', navsrv.GDMProgram, self.program_server)
             rospy.loginfo ('(init) GDM Node init complete')
 
     _cmd_ctrl_argdict = {
@@ -258,7 +259,9 @@ class GDMNode (object):
                 try:
                     cmd = Command.get_instance (self.node, stmt)
                 except StatementFormatException as e:
-                    raise StatementFormatException ('error in line {}: {}'.format(i+1, e))
+                    err = 'error in line {}: {}'.format(i+1, e)
+                    rospy.logerr (err)
+                    raise StatementFormatException (err)
                 if cmd:
                     cmds.append (cmd)
 
@@ -332,7 +335,7 @@ class GDMNode (object):
             self.killed = True
 
     def ctrl_server (self, arg):
-        '''Server for gdm_ctrl service'''
+        '''Server for /gdm/ctrl service'''
         # input can be service message or raw str
         arg = getattr (arg, 'data', arg)
         with self.exec_lock:
@@ -343,6 +346,14 @@ class GDMNode (object):
                 return False
             func()
             return True
+
+    def program_server (self, msg):
+        '''Server for /gdm/program service'''
+        try:
+            self.load (msg.program)
+        except StatementFormatException as e:
+            return navsrv.GDMProgramResponse (success=False, info=str(e))
+        return navsrv.GDMProgramResponse (success=True, info='loaded ok')
 
     def spin (self):
         rate = rospy.Rate (self.FREQ)

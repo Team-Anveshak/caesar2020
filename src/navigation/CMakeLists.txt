@@ -64,6 +64,7 @@ find_package(catkin REQUIRED COMPONENTS
    dist_state.srv
    AvoidNodeCtrl.srv
    GDMCtrl.srv
+   GDMProgram.srv
  )
 
 ## Generate actions in the 'action' folder

@@ -1,0 +1,9 @@
+# program statements in desired order of execution
+string[] program
+
+---
+# False if program is formatted incorrectly
+bool success
+
+# a human readable string useful for debugging errors
+string info

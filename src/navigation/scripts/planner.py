@@ -31,6 +31,7 @@ class Planner():
 
 		#service server
 		self.state_ser=rospy.Service('Planner_state_ctrl',plan_state,self.state_ctrl) #state service
+		print 'done'
 
 	def spin(self):
 		rate = rospy.Rate(25)
@@ -86,10 +87,13 @@ class Planner():
 	def state_ctrl(self,srv_msg):
 		if (srv_msg.pause==1 and srv_msg.contin==0 ) :
 			self.state = "pause"
+			print 'pause'
 		elif (srv_msg.contin==1 and srv_msg.pause==0):
 			self.state = "run"
+			print 'run'
 		elif (srv_msg.rst==1):
 			self.state = "stop"
+			print 'stop'
 		else:
 			rospy.loginfo("Error in changing planner state")
 		#print(srv_msg.contin)
@@ -181,7 +185,7 @@ class Planner():
 		self.distance_to_dest = float(msg.target_dist)
 		bearing_dest = (self.bearing_curr + float(msg.deviation)) % 360
 		if bearing_dest > 180:
-			bearing_dest -= 180
+			bearing_dest -= 360
 		self.bearing_dest = bearing_dest
 
 	def distCallback(self,msg): #getting the position of the bot from the pos calculator
