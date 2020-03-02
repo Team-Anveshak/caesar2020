@@ -93,6 +93,8 @@ class Planner():
 			print 'run'
 		elif (srv_msg.rst==1):
 			self.state = "stop"
+			self.load_params()
+			self.load_vars()
 			print 'stop'
 		else:
 			rospy.loginfo("Error in changing planner state")
@@ -165,7 +167,7 @@ class Planner():
 		self.kd=0
 
 	def load_vars(self):
-		self.state  = "run"  # states are 'run','pause','stop'
+		self.state  = "stop"  # states are 'run','pause','stop'
 		self.bearing_dest = 150
 		self.bearing_curr = 0			#current bearing of the rover
 		self.distance_to_dest = 20

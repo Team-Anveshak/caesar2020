@@ -168,8 +168,8 @@ class Navigate (Command):
 
     def pause (self):
         try:
-            self.node.plan_srv (pause=0, contin=0, rst=1)
             self.node.avoid_srv (ROSNode._avoid.PAUSE, self.lat, self.lon)
+            self.node.plan_srv (pause=0, contin=0, rst=1)
         except rospy.ServiceException as e:
             raise ControlFlowException(e)
 

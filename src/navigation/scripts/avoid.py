@@ -1,17 +1,12 @@
 #!/usr/bin/env python
 """
 Obstacle Avoidance
-
-Subscribes to a ThetaR.msg representing visible obstacles
-Also subscribes to present location (Point.msg)
-and target location (Point.msg)
-
-Publishes temporary destination Point
 """
 
 import rospy
 import std_msgs.msg as std_msgs
 import sensor_msgs.msg as sensor_msgs
+import sensors.msg as senmsg_cust
 
 import navigation.msg
 import navigation.srv
@@ -138,7 +133,7 @@ class AvoidNode:
         ##
         rospy.Subscriber ("fix", sensor_msgs.NavSatFix, vvars.update_curr_loc)
         rospy.Subscriber ("goal_loc", sensor_msgs.NavSatFix, vvars.update_goal_loc)
-        rospy.Subscriber ("imu", sensor_msgs.Imu, vvars.update_yaw)
+        rospy.Subscriber ("imu", senmsg_cust.Imu, vvars.update_yaw)
         self.pub = rospy.Publisher ("target", navigation.msg.Target, queue_size=1)
         rospy.init_node ('avoid_node')
 
@@ -184,7 +179,7 @@ class AvoidNode:
                     msg = navigation.msg.Target()
                     msg.target_dist, msg.deviation, msg.goal_dist, valid_msg.data = self.vvars.get_output()
                     self.pub.publish (msg)
-                
+
             rate.sleep()
 
 class Compute:
